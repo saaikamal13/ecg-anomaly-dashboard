@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🫀 ECG Anomaly Detection Dashboard</title>
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0f0f1a;
+            --bg-secondary: #1a1a2e;
+            --bg-card: #16213e;
+            --bg-card-hover: #1a2744;
+            --accent: #e94560;
+            --accent-green: #00d4aa;
+            --accent-blue: #4ecdc4;
+            --accent-yellow: #ffd93d;
+            --text-primary: #eaeaea;
+            --text-secondary: #a0a0b0;
+            --border: #2a2a4a;
+            --shadow: 0 8px 32px rgba(0,0,0,0.3);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+        }
+
+        /* ── Header ─────────────────────────────────────────── */
+        .header {
+            background: linear-gradient(135deg, var(--bg-secondary), var(--bg-card));
+            padding: 24px 40px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .header h1 {
+            font-size: 1.6rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--accent), var(--accent-blue));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .header .subtitle {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+        .header-stats {
+            display: flex;
+            gap: 20px;
+        }
+        .header-stat {
+            text-align: center;
+            padding: 8px 16px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 8px;
+        }
+        .header-stat .value {
+            font-size: 1.4rem;
+            font-weight: 700;
+        }
+        .header-stat .label {
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* ── Tabs ───────────────────────────────────────────── */
+        .tabs {
+            display: flex;
+            gap: 2px;
+            padding: 16px 40px 0;
+            background: var(--bg-primary);
+        }
+        .tab {
+            padding: 12px 24px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-bottom: none;
+            border-radius: 10px 10px 0 0;
+            cursor: pointer;
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            transition: all 0.2s;
+        }
+        .tab:hover { background: var(--bg-card); color: var(--text-primary); }
+        .tab.active {
+            background: var(--bg-card);
+            color: var(--accent);
+            border-color: var(--accent);
+            border-bottom: 2px solid var(--bg-card);
+        }
+
+        /* ── Content ────────────────────────────────────────── */
+        .content {
+            padding: 0 40px 40px;
+        }
+        .tab-panel {
+            display: none;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 0 12px 12px 12px;
+            padding: 24px;
+        }
+        .tab-panel.active { display: block; }
+
+        /* ── Cards ──────────────────────────────────────────── */
+        .card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: var(--shadow);
+        }
+        .card h3 {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: var(--accent-blue);
+        }
+
+        /* ── Buttons ────────────────────────────────────────── */
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent), #c73e55);
+            color: white;
+        }
+        .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 16px rgba(233,69,96,0.4); }
+        .btn-secondary {
+            background: rgba(255,255,255,0.1);
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+        }
+        .btn-secondary:hover { background: rgba(255,255,255,0.15); }
+        .btn-green {
+            background: linear-gradient(135deg, var(--accent-green), #00b894);
+            color: #0f0f1a;
+        }
+        .btn-blue {
+            background: linear-gradient(135deg, var(--accent-blue), #3dbbb3);
+            color: #0f0f1a;
+        }
+
+        .btn-group { display: flex; gap: 8px; flex-wrap: wrap; }
+
+        /* ── Grid ───────────────────────────────────────────── */
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; }
+        .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+
+        /* ── Metric Cards ───────────────────────────────────── */
+        .metric-card {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+        }
+        .metric-card .metric-value {
+            font-size: 2rem;
+            font-weight: 700;
+        }
+        .metric-card .metric-label {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-top: 4px;
+        }
+        .metric-green .metric-value { color: var(--accent-green); }
+        .metric-red .metric-value { color: var(--accent); }
+        .metric-blue .metric-value { color: var(--accent-blue); }
+        .metric-yellow .metric-value { color: var(--accent-yellow); }
+
+        /* ── Result Badge ───────────────────────────────────── */
+        .badge {
+            display: inline-block;
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+        .badge-normal { background: rgba(0,212,170,0.15); color: var(--accent-green); border: 1px solid rgba(0,212,170,0.3); }
+        .badge-anomaly { background: rgba(233,69,96,0.15); color: var(--accent); border: 1px solid rgba(233,69,96,0.3); }
+        .badge-correct { background: rgba(0,212,170,0.15); color: var(--accent-green); }
+        .badge-incorrect { background: rgba(233,69,96,0.15); color: var(--accent); }
+
+        /* ── Prediction Result ──────────────────────────────── */
+        .prediction-result {
+            display: flex;
+            align-items: center;
+            gap: 24px;
+            padding: 20px;
+            border-radius: 12px;
+            margin-top: 16px;
+        }
+        .prediction-normal {
+            background: linear-gradient(135deg, rgba(0,212,170,0.1), rgba(0,212,170,0.05));
+            border: 1px solid rgba(0,212,170,0.3);
+        }
+        .prediction-anomaly {
+            background: linear-gradient(135deg, rgba(233,69,96,0.1), rgba(233,69,96,0.05));
+            border: 1px solid rgba(233,69,96,0.3);
+        }
+        .prediction-icon { font-size: 2.5rem; }
+        .prediction-text h3 { font-size: 1.2rem; margin-bottom: 4px; }
+        .prediction-text p { font-size: 0.85rem; color: var(--text-secondary); }
+
+        /* ── Textarea ───────────────────────────────────────── */
+        textarea {
+            width: 100%;
+            min-height: 120px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-family: 'JetBrains Mono', monospace, 'Inter';
+            font-size: 0.8rem;
+            padding: 12px;
+            resize: vertical;
+        }
+        textarea:focus { outline: none; border-color: var(--accent-blue); }
+
+        /* ── Navigator ──────────────────────────────────────── */
+        .navigator {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        .navigator input[type="number"] {
+            width: 100px;
+            padding: 8px 12px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 0.9rem;
+        }
+        .navigator input:focus { outline: none; border-color: var(--accent-blue); }
+
+        /* ── Plotly overrides ────────────────────────────────── */
+        .js-plotly-plot .plotly .modebar { top: 8px !important; right: 8px !important; }
+
+        /* ── Confusion Matrix ───────────────────────────────── */
+        .confusion-table {
+            width: 100%;
+            max-width: 400px;
+            margin: 0 auto;
+            border-collapse: collapse;
+        }
+        .confusion-table td, .confusion-table th {
+            padding: 16px;
+            text-align: center;
+            border: 1px solid var(--border);
+            font-size: 0.9rem;
+        }
+        .confusion-table th {
+            background: var(--bg-primary);
+            font-weight: 600;
+            color: var(--text-secondary);
+            font-size: 0.75rem;
+            text-transform: uppercase;
+        }
+        .cm-tp { background: rgba(0,212,170,0.15); color: var(--accent-green); font-weight: 700; font-size: 1.2rem; }
+        .cm-tn { background: rgba(78,205,196,0.15); color: var(--accent-blue); font-weight: 700; font-size: 1.2rem; }
+        .cm-fp { background: rgba(255,217,61,0.15); color: var(--accent-yellow); font-weight: 700; font-size: 1.2rem; }
+        .cm-fn { background: rgba(233,69,96,0.15); color: var(--accent); font-weight: 700; font-size: 1.2rem; }
+
+        /* ── Loading ────────────────────────────────────────── */
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px;
+            color: var(--text-secondary);
+        }
+        .spinner {
+            width: 24px; height: 24px;
+            border: 3px solid var(--border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-right: 12px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ── Pulse animation for heartbeat icon ─────────────── */
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.15); }
+        }
+        .pulse { animation: pulse 1s ease-in-out infinite; display: inline-block; }
+
+        /* ── Responsive ─────────────────────────────────────── */
+        @media (max-width: 900px) {
+            .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+            .header { flex-direction: column; gap: 16px; }
+            .content { padding: 0 16px 24px; }
+            .tabs { padding: 16px 16px 0; overflow-x: auto; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- ── Header ──────────────────────────────────────────────────────── -->
+<div class="header">
+    <div>
+        <h1><span class="pulse">🫀</span> ECG Anomaly Detection Dashboard</h1>
+        <div class="subtitle">Deep Neural Autoencoder · Real-time anomaly detection on ECG signals</div>
+    </div>
+    <div class="header-stats" id="headerStats">
+        <div class="header-stat">
+            <div class="value" id="statTotal">—</div>
+            <div class="label">Samples</div>
+        </div>
+        <div class="header-stat">
+            <div class="value" style="color: var(--accent-green)" id="statAccuracy">—</div>
+            <div class="label">Accuracy</div>
+        </div>
+        <div class="header-stat">
+            <div class="value" style="color: var(--accent)" id="statThreshold">—</div>
+            <div class="label">Threshold</div>
+        </div>
+    </div>
+</div>
+
+<!-- ── Tabs ─────────────────────────────────────────────────────────── -->
+<div class="tabs">
+    <div class="tab active" onclick="switchTab('explore')">🔍 Signal Explorer</div>
+    <div class="tab" onclick="switchTab('predict')">🧠 Live Prediction</div>
+    <div class="tab" onclick="switchTab('performance')">📊 Model Performance</div>
+    <div class="tab" onclick="switchTab('training')">📈 Training History</div>
+</div>
+
+<!-- ── Content ──────────────────────────────────────────────────────── -->
+<div class="content">
+
+    <!-- ── Tab 1: Signal Explorer ──────────────────────────────────── -->
+    <div class="tab-panel active" id="tab-explore">
+        <div class="card">
+            <h3>Navigate ECG Signals</h3>
+            <div class="navigator">
+                <span style="color: var(--text-secondary); font-size: 0.85rem;">Sample #</span>
+                <input type="number" id="sampleIndex" value="0" min="0">
+                <button class="btn btn-primary" onclick="loadSample()">Load</button>
+                <span style="color: var(--text-secondary);">|</span>
+                <button class="btn btn-secondary" onclick="prevSample()">← Prev</button>
+                <button class="btn btn-secondary" onclick="nextSample()">Next →</button>
+                <span style="color: var(--text-secondary);">|</span>
+                <button class="btn btn-green" onclick="randomSample('normal')">Random Normal</button>
+                <button class="btn btn-primary" onclick="randomSample('anomaly')">Random Anomaly</button>
+                <button class="btn btn-blue" onclick="randomSample()">Random Any</button>
+            </div>
+        </div>
+
+        <div id="sampleResult"></div>
+
+        <div class="grid-2">
+            <div class="card">
+                <h3>Original vs Reconstructed Signal</h3>
+                <div id="signalPlot" style="width:100%; height:350px;"></div>
+            </div>
+            <div class="card">
+                <h3>Point-wise Reconstruction Error</h3>
+                <div id="errorPlot" style="width:100%; height:350px;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Tab 2: Live Prediction ──────────────────────────────────── -->
+    <div class="tab-panel" id="tab-predict">
+        <div class="card">
+            <h3>Paste Custom ECG Signal</h3>
+            <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 12px;">
+                Enter 140 comma-separated numerical values representing an ECG heartbeat signal.
+            </p>
+            <textarea id="customInput" placeholder="e.g.: -0.112, -2.827, -3.773, -4.349, -4.376, ... (140 values total)"></textarea>
+            <div style="margin-top: 12px; display: flex; gap: 8px; align-items: center;">
+                <button class="btn btn-primary" onclick="predictCustom()">🧠 Analyze Signal</button>
+                <button class="btn btn-secondary" onclick="loadExampleNormal()">Load Normal Example</button>
+                <button class="btn btn-secondary" onclick="loadExampleAnomaly()">Load Anomaly Example</button>
+                <span id="customStatus" style="color: var(--text-secondary); font-size: 0.85rem;"></span>
+            </div>
+        </div>
+
+        <div id="customResult"></div>
+
+        <div class="grid-2">
+            <div class="card">
+                <h3>Original vs Reconstructed Signal</h3>
+                <div id="customSignalPlot" style="width:100%; height:350px;"></div>
+            </div>
+            <div class="card">
+                <h3>Reconstruction Error</h3>
+                <div id="customErrorPlot" style="width:100%; height:350px;"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Tab 3: Model Performance ────────────────────────────────── -->
+    <div class="tab-panel" id="tab-performance">
+        <div class="grid-4" id="perfMetrics">
+            <div class="metric-card metric-green">
+                <div class="metric-value" id="perfAccuracy">—</div>
+                <div class="metric-label">Accuracy</div>
+            </div>
+            <div class="metric-card metric-blue">
+                <div class="metric-value" id="perfPrecision">—</div>
+                <div class="metric-label">Precision</div>
+            </div>
+            <div class="metric-card metric-yellow">
+                <div class="metric-value" id="perfRecall">—</div>
+                <div class="metric-label">Recall</div>
+            </div>
+            <div class="metric-card metric-red">
+                <div class="metric-value" id="perfF1">—</div>
+                <div class="metric-label">F1 Score</div>
+            </div>
+        </div>
+
+        <div class="grid-2">
+            <div class="card">
+                <h3>Reconstruction Error Distribution</h3>
+                <div id="distPlot" style="width:100%; height:380px;"></div>
+            </div>
+            <div class="card">
+                <h3>Confusion Matrix</h3>
+                <div id="confusionMatrix" style="display:flex; justify-content:center; padding: 20px 0;"></div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>All Samples — MSE Scatter Plot</h3>
+            <div id="scatterPlot" style="width:100%; height:400px;"></div>
+        </div>
+    </div>
+
+    <!-- ── Tab 4: Training History ─────────────────────────────────── -->
+    <div class="tab-panel" id="tab-training">
+        <div class="grid-2">
+            <div class="card">
+                <h3>Training & Validation Loss</h3>
+                <div id="lossPlot" style="width:100%; height:400px;"></div>
+            </div>
+            <div class="card">
+                <h3>Model Architecture</h3>
+                <div style="padding: 16px; font-size: 0.85rem; color: var(--text-secondary); line-height: 1.8;">
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <tr style="border-bottom: 1px solid var(--border);">
+                            <td style="padding: 8px; font-weight: 600; color: var(--accent-blue);">Architecture</td>
+                            <td style="padding: 8px;">Deep Neural Autoencoder (PyTorch)</td>
+                        </tr>
+                        <tr style="border-bottom: 1px solid var(--border);">
+                            <td style="padding: 8px; font-weight: 600; color: var(--accent-blue);">Encoder</td>
+                            <td style="padding: 8px;">Linear(140→64) → BatchNorm → LeakyReLU → Dropout → Linear(64→32) → BatchNorm → LeakyReLU → Linear(32→16)</td>
+                        </tr>
+                        <tr style="border-bottom: 1px solid var(--border);">
+                            <td style="padding: 8px; font-weight: 600; color: var(--accent-blue);">Bottleneck</td>
+                            <td style="padding: 8px;">16 Latent Dimensions</td>
+                        </tr>
+                        <tr style="border-bottom: 1px solid var(--border);">
+                            <td style="padding: 8px; font-weight: 600; color: var(--accent-blue);">Decoder</td>
+                            <td style="padding: 8px;">Linear(16→32) → BatchNorm → LeakyReLU → Dropout → Linear(32→64) → BatchNorm → LeakyReLU → Linear(64→140)</td>
+                        </tr>
+                        <tr style="border-bottom: 1px solid var(--border);">
+                            <td style="padding: 8px; font-weight: 600; color: var(--accent-blue);">Loss</td>
+                            <td style="padding: 8px;">Mean Squared Error (MSE)</td>
+                        </tr>
+                        <tr style="border-bottom: 1px solid var(--border);">
+                            <td style="padding: 8px; font-weight: 600; color: var(--accent-blue);">Optimizer</td>
+                            <td style="padding: 8px;">AdamW (lr=2e-3, ReduceLROnPlateau, weight_decay=1e-5)</td>
+                        </tr>
+                        <tr style="border-bottom: 1px solid var(--border);">
+                            <td style="padding: 8px; font-weight: 600; color: var(--accent-blue);">Training</td>
+                            <td style="padding: 8px;">Normal signals only (label=1.0)</td>
+                        </tr>
+                        <tr style="border-bottom: 1px solid var(--border);">
+                            <td style="padding: 8px; font-weight: 600; color: var(--accent-blue);">Detection</td>
+                            <td style="padding: 8px;">Anomaly if MSE > μ + 2σ of normal errors</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; font-weight: 600; color: var(--accent-blue);">Input Shape</td>
+                            <td style="padding: 8px;">140 timesteps (ECG Lead II heartbeat waveform)</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+// ── Plotly layout defaults ─────────────────────────────────────────
+const plotlyLayout = {
+    paper_bgcolor: 'rgba(0,0,0,0)',
+    plot_bgcolor: 'rgba(0,0,0,0)',
+    font: { color: '#a0a0b0', family: 'Inter' },
+    margin: { l: 50, r: 20, t: 30, b: 40 },
+    xaxis: { gridcolor: '#2a2a4a', zerolinecolor: '#2a2a4a' },
+    yaxis: { gridcolor: '#2a2a4a', zerolinecolor: '#2a2a4a' },
+};
+const plotlyConfig = { responsive: true, displayModeBar: false };
+
+// ── Tab switching ──────────────────────────────────────────────────
+function switchTab(name) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    event.target.classList.add('active');
+    document.getElementById('tab-' + name).classList.add('active');
+
+    if (name === 'performance' && !window._perfLoaded) loadPerformance();
+    if (name === 'training' && !window._trainLoaded) loadTrainingHistory();
+}
+
+// ── Signal Explorer ────────────────────────────────────────────────
+let currentIndex = 0;
+
+function loadSample() {
+    const idx = parseInt(document.getElementById('sampleIndex').value);
+    if (isNaN(idx)) return;
+    currentIndex = idx;
+    fetchSample(idx);
+}
+function prevSample() { currentIndex = Math.max(0, currentIndex - 1); document.getElementById('sampleIndex').value = currentIndex; fetchSample(currentIndex); }
+function nextSample() { currentIndex++; document.getElementById('sampleIndex').value = currentIndex; fetchSample(currentIndex); }
+function randomSample(label) {
+    const url = label ? `/api/random_sample?label=${label}` : '/api/random_sample';
+    fetch(url).then(r => r.json()).then(data => {
+        currentIndex = data.index;
+        document.getElementById('sampleIndex').value = currentIndex;
+        renderSample(data);
+    });
+}
+
+function fetchSample(idx) {
+    fetch(`/api/sample/${idx}`).then(r => r.json()).then(renderSample);
+}
+
+function renderSample(data) {
+    // Result badge
+    const isAnomaly = data.predicted_label === 'Anomaly';
+    const cls = isAnomaly ? 'anomaly' : 'normal';
+    const icon = isAnomaly ? '⚠️' : '✅';
+    const correctBadge = data.true_label
+        ? `<span class="badge ${data.is_correct ? 'badge-correct' : 'badge-incorrect'}">${data.is_correct ? '✓ Correct' : '✗ Misclassified'}</span>` : '';
+    const trueLabel = data.true_label
+        ? `<span class="badge badge-${data.true_label.toLowerCase()}">${data.true_label}</span>` : '';
+
+    document.getElementById('sampleResult').innerHTML = `
+        <div class="prediction-result prediction-${cls}">
+            <div class="prediction-icon">${icon}</div>
+            <div class="prediction-text">
+                <h3>Predicted: <span class="badge badge-${cls}">${data.predicted_label}</span> ${trueLabel} ${correctBadge}</h3>
+                <p>Reconstruction MSE: <strong>${data.mse.toFixed(6)}</strong> | Threshold: <strong>${data.threshold.toFixed(6)}</strong> | 
+                   Error is <strong>${(data.mse / data.threshold * 100).toFixed(1)}%</strong> of threshold</p>
+            </div>
+        </div>`;
+
+    // Signal plot
+    const x = Array.from({length: 140}, (_, i) => i);
+    Plotly.newPlot('signalPlot', [
+        { x, y: data.signal, name: 'Original', line: { color: '#4ecdc4', width: 2 } },
+        { x, y: data.reconstructed, name: 'Reconstructed', line: { color: '#e94560', width: 2, dash: 'dot' } },
+    ], { ...plotlyLayout, legend: { x: 0, y: 1.15, orientation: 'h' }, xaxis: { ...plotlyLayout.xaxis, title: 'Time Step' }, yaxis: { ...plotlyLayout.yaxis, title: 'Amplitude' } }, plotlyConfig);
+
+    // Error plot
+    const errors = data.signal.map((v, i) => Math.pow(((v - data.reconstructed[i])), 2));
+    Plotly.newPlot('errorPlot', [
+        { x, y: errors, type: 'bar', marker: { color: errors.map(e => e > data.threshold / 140 ? '#e94560' : '#4ecdc4'), opacity: 0.7 } },
+    ], { ...plotlyLayout, xaxis: { ...plotlyLayout.xaxis, title: 'Time Step' }, yaxis: { ...plotlyLayout.yaxis, title: 'Squared Error' }, showlegend: false }, plotlyConfig);
+}
+
+// Load first sample on start
+fetchSample(0);
+
+// ── Live Prediction ────────────────────────────────────────────────
+function predictCustom() {
+    const input = document.getElementById('customInput').value.trim();
+    const values = input.split(/[\s,]+/).map(Number).filter(v => !isNaN(v));
+    const status = document.getElementById('customStatus');
+
+    if (values.length !== 140) {
+        status.textContent = `⚠️ Got ${values.length} values, need exactly 140`;
+        status.style.color = '#e94560';
+        return;
+    }
+
+    status.textContent = 'Analyzing…';
+    status.style.color = '#a0a0b0';
+
+    fetch('/api/predict', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ values }),
+    })
+    .then(r => r.json())
+    .then(data => {
+        status.textContent = '';
+        const isAnomaly = data.predicted_label === 'Anomaly';
+        const cls = isAnomaly ? 'anomaly' : 'normal';
+        const icon = isAnomaly ? '⚠️' : '✅';
+
+        document.getElementById('customResult').innerHTML = `
+            <div class="prediction-result prediction-${cls}">
+                <div class="prediction-icon">${icon}</div>
+                <div class="prediction-text">
+                    <h3>Prediction: <span class="badge badge-${cls}">${data.predicted_label}</span></h3>
+                    <p>Reconstruction MSE: <strong>${data.mse.toFixed(6)}</strong> | Threshold: <strong>${data.threshold.toFixed(6)}</strong> |
+                       Error is <strong>${(data.mse / data.threshold * 100).toFixed(1)}%</strong> of threshold</p>
+                </div>
+            </div>`;
+
+        const x = Array.from({length: 140}, (_, i) => i);
+        Plotly.newPlot('customSignalPlot', [
+            { x, y: data.signal, name: 'Original', line: { color: '#4ecdc4', width: 2 } },
+            { x, y: data.reconstructed, name: 'Reconstructed', line: { color: '#e94560', width: 2, dash: 'dot' } },
+        ], { ...plotlyLayout, legend: { x: 0, y: 1.15, orientation: 'h' }, xaxis: { ...plotlyLayout.xaxis, title: 'Time Step' }, yaxis: { ...plotlyLayout.yaxis, title: 'Amplitude' } }, plotlyConfig);
+
+        const errors = data.signal.map((v, i) => Math.pow(v - data.reconstructed[i], 2));
+        Plotly.newPlot('customErrorPlot', [
+            { x, y: errors, type: 'bar', marker: { color: errors.map(e => e > data.threshold / 140 ? '#e94560' : '#4ecdc4'), opacity: 0.7 } },
+        ], { ...plotlyLayout, xaxis: { ...plotlyLayout.xaxis, title: 'Time Step' }, yaxis: { ...plotlyLayout.yaxis, title: 'Squared Error' }, showlegend: false }, plotlyConfig);
+    })
+    .catch(err => { status.textContent = '❌ Error: ' + err; status.style.color = '#e94560'; });
+}
+
+function loadExampleNormal() {
+    fetch('/api/random_sample?label=normal').then(r => r.json()).then(data => {
+        document.getElementById('customInput').value = data.signal.join(', ');
+        document.getElementById('customStatus').textContent = '✅ Loaded a normal ECG sample — click Analyze!';
+        document.getElementById('customStatus').style.color = '#00d4aa';
+    });
+}
+function loadExampleAnomaly() {
+    fetch('/api/random_sample?label=anomaly').then(r => r.json()).then(data => {
+        document.getElementById('customInput').value = data.signal.join(', ');
+        document.getElementById('customStatus').textContent = '⚠️ Loaded an anomalous ECG sample — click Analyze!';
+        document.getElementById('customStatus').style.color = '#e94560';
+    });
+}
+
+// ── Model Performance ──────────────────────────────────────────────
+function loadPerformance() {
+    fetch('/api/overview').then(r => r.json()).then(data => {
+        window._perfLoaded = true;
+        const cm = data.confusion_matrix;
+        const accuracy = (cm.tp + cm.tn) / (cm.tp + cm.tn + cm.fp + cm.fn);
+        const precision = cm.tp / (cm.tp + cm.fp) || 0;
+        const recall = cm.tp / (cm.tp + cm.fn) || 0;
+        const f1 = 2 * precision * recall / (precision + recall) || 0;
+
+        document.getElementById('perfAccuracy').textContent = (accuracy * 100).toFixed(1) + '%';
+        document.getElementById('perfPrecision').textContent = (precision * 100).toFixed(1) + '%';
+        document.getElementById('perfRecall').textContent = (recall * 100).toFixed(1) + '%';
+        document.getElementById('perfF1').textContent = (f1 * 100).toFixed(1) + '%';
+
+        // Header stats
+        document.getElementById('statTotal').textContent = data.total_samples.toLocaleString();
+        document.getElementById('statAccuracy').textContent = (accuracy * 100).toFixed(1) + '%';
+        document.getElementById('statThreshold').textContent = data.threshold.toFixed(4);
+
+        // Distribution plot
+        Plotly.newPlot('distPlot', [
+            { x: data.normal_mse, name: 'Normal', type: 'histogram', marker: { color: 'rgba(0,212,170,0.6)' }, nbinsx: 60 },
+            { x: data.anomaly_mse, name: 'Anomaly', type: 'histogram', marker: { color: 'rgba(233,69,96,0.6)' }, nbinsx: 60 },
+        ], {
+            ...plotlyLayout,
+            barmode: 'overlay',
+            xaxis: { ...plotlyLayout.xaxis, title: 'Reconstruction MSE' },
+            yaxis: { ...plotlyLayout.yaxis, title: 'Count' },
+            shapes: [{
+                type: 'line', x0: data.threshold, x1: data.threshold, y0: 0, y1: 1,
+                yref: 'paper', line: { color: '#ffd93d', width: 2, dash: 'dash' },
+            }],
+            annotations: [{
+                x: data.threshold, y: 1, yref: 'paper', text: 'Threshold',
+                showarrow: true, arrowhead: 2, ax: 40, ay: -20, font: { color: '#ffd93d', size: 12 },
+            }],
+            legend: { x: 0.7, y: 0.95 },
+        }, plotlyConfig);
+
+        // Confusion matrix
+        document.getElementById('confusionMatrix').innerHTML = `
+            <table class="confusion-table">
+                <tr><th></th><th>Pred Normal</th><th>Pred Anomaly</th></tr>
+                <tr><th>Actual Normal</th><td class="cm-tn">${cm.tn}<br><small>True Neg</small></td><td class="cm-fp">${cm.fp}<br><small>False Pos</small></td></tr>
+                <tr><th>Actual Anomaly</th><td class="cm-fn">${cm.fn}<br><small>False Neg</small></td><td class="cm-tp">${cm.tp}<br><small>True Pos</small></td></tr>
+            </table>`;
+
+        // Scatter plot
+        const normalIdx = [], normalMSE = [], anomalyIdx = [], anomalyMSE = [];
+        const allMSE = [...data.normal_mse, ...data.anomaly_mse];
+        data.normal_mse.forEach((v, i) => { normalIdx.push(i); normalMSE.push(v); });
+        data.anomaly_mse.forEach((v, i) => { anomalyIdx.push(data.normal_mse.length + i); anomalyMSE.push(v); });
+
+        Plotly.newPlot('scatterPlot', [
+            { x: normalIdx, y: normalMSE, name: 'Normal', mode: 'markers', marker: { color: '#00d4aa', size: 4, opacity: 0.5 } },
+            { x: anomalyIdx, y: anomalyMSE, name: 'Anomaly', mode: 'markers', marker: { color: '#e94560', size: 4, opacity: 0.5 } },
+        ], {
+            ...plotlyLayout,
+            xaxis: { ...plotlyLayout.xaxis, title: 'Sample Index' },
+            yaxis: { ...plotlyLayout.yaxis, title: 'Reconstruction MSE' },
+            shapes: [{
+                type: 'line', x0: 0, x1: allMSE.length, y0: data.threshold, y1: data.threshold,
+                line: { color: '#ffd93d', width: 2, dash: 'dash' },
+            }],
+            legend: { x: 0, y: 1.1, orientation: 'h' },
+        }, plotlyConfig);
+    });
+}
+
+// ── Training History ───────────────────────────────────────────────
+function loadTrainingHistory() {
+    fetch('/api/training_history').then(r => r.json()).then(data => {
+        window._trainLoaded = true;
+        const epochs = Array.from({length: data.loss.length}, (_, i) => i + 1);
+
+        Plotly.newPlot('lossPlot', [
+            { x: epochs, y: data.loss, name: 'Train Loss', line: { color: '#4ecdc4', width: 2 } },
+            { x: epochs, y: data.val_loss, name: 'Val Loss', line: { color: '#e94560', width: 2 } },
+        ], {
+            ...plotlyLayout,
+            xaxis: { ...plotlyLayout.xaxis, title: 'Epoch' },
+            yaxis: { ...plotlyLayout.yaxis, title: 'MSE Loss' },
+            legend: { x: 0.7, y: 0.95 },
+        }, plotlyConfig);
+    });
+}
+
+// ── Init header stats ──────────────────────────────────────────────
+fetch('/api/overview').then(r => r.json()).then(data => {
+    const cm = data.confusion_matrix;
+    const accuracy = (cm.tp + cm.tn) / (cm.tp + cm.tn + cm.fp + cm.fn);
+    document.getElementById('statTotal').textContent = data.total_samples.toLocaleString();
+    document.getElementById('statAccuracy').textContent = (accuracy * 100).toFixed(1) + '%';
+    document.getElementById('statThreshold').textContent = data.threshold.toFixed(4);
+});
+</script>
+
+</body>
+</html>

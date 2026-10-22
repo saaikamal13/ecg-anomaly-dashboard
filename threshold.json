@@ -1,0 +1,15 @@
+{
+  "threshold": 0.0015928490902297199,
+  "normal_mse_mean": 0.0005039453390054405,
+  "normal_mse_std": 0.0005444518756121397,
+  "anomaly_mse_mean": 0.004981930833309889,
+  "anomaly_mse_std": 0.001756993937306106,
+  "accuracy": 0.9891100262861434,
+  "precision": 0.9918426103646834,
+  "recall": 0.9942279942279942,
+  "f1": 0.9930338698054288,
+  "normal_correct": 567,
+  "normal_total": 584,
+  "anomaly_correct": 2067,
+  "anomaly_total": 2079
+}
